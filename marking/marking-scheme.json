@@ -1,1 +1,495 @@
-{}
+{
+	"totalMark": 31,
+	"wsosSections": {
+		"1": "Work organization and self-management",
+		"2": "Communication and interpersonal skills",
+		"3": "Design Implementation",
+		"4": "Front-End Development",
+		"5": "Back-End Development"
+	},
+	"subCriterions": [
+		{
+			"name": "Project Setup & SPA",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "Application is implemented as a Single Page Application using a JavaScript framework with client-side routing",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Check: navigate between pages without full-page reload. Verify a framework (React, Vue, etc.) is used with router-based navigation.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Deep-linked URLs work after page reload - reloading /courses/:slug or /courses/:slug/chapters/:id shows the correct view, not a blank page or 404",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: navigate to a course page, copy the URL, reload the browser. The correct view must be shown (with auth state restored from storage). Repeat for a chapter page URL.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Base URLs are configured in the Local Storage (lmsSiteUrl)",
+					"maxMark": 1.0,
+					"wsosSection": 1,
+					"extraDescription": "Check the Local Storage. lmsSiteUrl must be set and used for all header/logo dashboard links and the 401 redirect target.",
+					"calculation": { "type": "pass-or-fail" }
+				}
+			]
+		},
+		{
+			"name": "Authentication & Token",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "Token is extracted from the query string (e.g. ?token=…) when the LMS is opened from the dashboard",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: open the LMS URL with ?token=<valid_token> appended (simulating a dashboard redirect). The app must read the token and use it for subsequent API calls without requiring a separate login form.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Token is stored in localStorage and persists across page reloads",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: open LMS with ?token=<valid_token>. Reload the page. Open DevTools → Application → localStorage and verify the token is still stored. API calls after reload must still succeed with the stored token.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Bearer token is included in the Authorization header for all authenticated API requests",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: open DevTools Network tab. Navigate to a course page and a chapter page. Each request to /api/courses/* must have the header 'Authorization: Bearer <token>'.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Any 401 Unauthorized response from the content service triggers a full-page navigation to the dashboard base URL",
+					"maxMark": 1.0,
+					"wsosSection": 2,
+					"extraDescription": "Test: use an expired or invalid token, then navigate to a course page or chapter page. The browser must perform a full-page redirect (window.location or equivalent) to the dashboard URL - not display an inline error message. Also test: submitting a quiz with an invalid token returns 401 → redirect.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Header shows a signed-in indicator when a token is present",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: open LMS with a valid token. The header must show a signed-in indicator (e.g. 'Signed in', user name, or similar). Without a stored token, this indicator should not be present.",
+					"calculation": { "type": "pass-or-fail" }
+				}
+			]
+		},
+		{
+			"name": "UI/UX",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "Header contains a logo or title that links to the dashboard home",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: click the header logo or application title. Should navigate to the dashboard base URL.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Header contains a navigation link to the dashboard courses page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify a link in the header targets the dashboard courses section. The link must be distinguishable from the logo link.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "A visible loading indicator is displayed during API requests and page navigation",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: throttle the network in DevTools to Slow 3G. Navigate to a course page and then a chapter page. A spinner, progress bar, skeleton screen, or similar loading state must be visible while data is loading.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "A dark/light theme toggle is present in the header and switches the active theme",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: locate the theme toggle in the header. Click it - the page must visibly switch between dark and light themes. Verify both themes are visually distinct (different background colors, text colors, or surface colors as defined in the SSA style guide).",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Both dark and light themes are visually distinct and follow the SSA style guide color palette",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: switch between dark and light themes. Verify that the color palette (backgrounds, surfaces, text, accents) differs meaningfully between the two themes and corresponds to the colors defined in assets/style-guide/ssa-style-guide.md. A theme that only changes one element (e.g. only the background) does not pass.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "The active theme is persisted in localStorage and restored on page reload without flickering",
+					"maxMark": 1,
+					"wsosSection": 4,
+					"extraDescription": "Test: switch to the light theme, then reload the page. The light theme must still be active. Switch to dark, reload - dark must persist. Check DevTools → Application → localStorage for a theme preference key.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Dark theme is applied by default when no theme preference is stored in localStorage",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: clear localStorage (DevTools → Application → Storage → Clear), then reload the app. Without any stored preference the dark theme must be active, not the light theme.",
+					"calculation": { "type": "pass-or-fail" }
+				}
+			]
+		},
+		{
+			"name": "Course Page",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "GET /api/courses/:slug is called with a valid Bearer Authorization header",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: open DevTools Network tab, navigate to /courses/:slug. Confirm a GET request is made to the content service /api/courses/:slug endpoint with 'Authorization: Bearer <token>' and the response status is 200.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Course title is displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify the course title from the API response (field: title) is visible somewhere on the course page.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Course description is displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify the course description from the API response is visible on the course page.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Course difficulty is displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify the difficulty level from the API response is shown on the course page.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Total chapter count is displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: compare the chapter count shown on the page against the API response totalChapters value - they must match.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Total credits are displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: compare the credits value shown on the page against the API response totalCredits value - they must match.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Course hero image is displayed on the course page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: a course banner or hero image must be visible. It can use a URL pattern based on the slug (e.g. /<slug>.webp from a static assets origin) or a placeholder image - either is acceptable.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "All chapters are listed in API order, each showing title, short description, and credits",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: count chapters in the API response and on the page - must match. For each chapter entry verify: title, short description, and credits are all visible. Order must match the API response.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Completed chapters are visually distinct from incomplete ones (e.g. checkmark badge, different color, completion label)",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: complete a chapter quiz and return to the course page. The completed chapter entry must look visually different from incomplete ones - a badge, icon, or color change that clearly communicates completion.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "The first chapter is always unlocked and navigable regardless of completion state",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: on a fresh course with no completed chapters, click the first chapter entry. It must navigate to the chapter page without any lock or restriction.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "A chapter is unlocked (navigable) only if its immediately preceding chapter is completed",
+					"maxMark": 1.0,
+					"wsosSection": 4,
+					"extraDescription": "Test: on a course with chapters 1, 2, 3 where only chapter 1 is completed - chapter 2 must be navigable, chapter 3 must be locked. Complete chapter 2 and verify chapter 3 becomes navigable. Chapter 4 must still be locked.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Locked chapters are clearly indicated and clicking them does NOT navigate to the chapter page",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: click on a locked chapter entry. No navigation to the chapter page should occur. The entry must have a visual indicator of its locked state (lock icon, greyed-out styling, 'Locked' label, or similar).",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Chapter completion state reflects live API data - the course page re-fetches or updates after a chapter is completed",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: complete a chapter quiz, then navigate back to the course page. The newly completed chapter must show as completed and the next chapter must now appear unlocked, reflecting the updated API data.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "judgement",
+					"description": "Course page visual design quality (layout, typography, chapter list presentation, spacing, component treatment)",
+					"maxMark": 2.0,
+					"wsosSection": 4,
+					"judgementScoreDescription": [
+						"Course page is not implemented or elements are entirely unstyled; no meaningful layout is present",
+						"Basic layout present but does not follow the SSA design guide; significant deviations in spacing, typography, or chapter list treatment; completion and lock states are not visually communicated",
+						"Course page generally follows the SSA design guide; layout, chapter list, and header area are recognizable and mostly consistent; minor deviations in color, spacing, or visual details",
+						"Course page closely matches the SSA design guide; course header, hero image, and chapter list are polished; completion badges, lock indicators, and credits are cleanly integrated; responsive behaviour is correct across screen sizes"
+					]
+				}
+			]
+		},
+		{
+			"name": "Chapter Page - Content Blocks",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "GET /api/courses/:slug/chapters/:chapterId is called with a valid Bearer Authorization header",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: open DevTools Network tab, navigate to a chapter page. Confirm a GET request to /api/courses/:slug/chapters/:chapterId with 'Authorization: Bearer <token>' header returns 200.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "A navigation link back to the parent course page is present and functional",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: on the chapter page, there must be a visible clickable link or button (e.g. '← Back to course', breadcrumb, or similar). Clicking it must navigate to /courses/:slug without a full-page reload.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Chapter title is displayed in the chapter page header",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify the chapter title from the API response is prominently visible near the top of the chapter page.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Chapter description is displayed when present in the API response",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: on a chapter where the API returns a non-null description, verify it is displayed on the page. If description is null/absent, the page must not show an error or placeholder artefact.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Chapter credits are displayed on the chapter page",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: verify the credits value from the API response is visible on the chapter page.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Content blocks are rendered in ascending orderIndex order",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: in DevTools Network, inspect the chapter API response. Compare the orderIndex values of content blocks against their rendered position on the page - the visual order must match ascending orderIndex.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Heading blocks (h1-h4) are rendered as the corresponding HTML heading elements with the correct text",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: in a chapter with heading blocks, inspect the DOM. A block with type 'h2' must render as <h2>, 'h3' as <h3>, etc., using the text from the block's 'text' field.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Paragraph blocks are rendered using the server-provided 'html' field (not rawText)",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: inspect a paragraph block in the DOM. The rendered HTML must originate from the block's 'html' field. Rich text formatting (bold, italic, styled text) present in the html should be preserved and visible.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Consecutive list_item blocks are merged into a single <ul> element",
+					"maxMark": 1.0,
+					"wsosSection": 4,
+					"extraDescription": "Test: in a chapter with multiple consecutive list_item blocks, inspect the DOM. They must all appear inside a single <ul> (not separate <ul> per item). A non-list block between two groups of list_items should produce two separate <ul> elements.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Image blocks are rendered as <img> elements with src from the url field and the alt attribute set",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: in a chapter with an image block, inspect the DOM. Must render <img src='<url>' alt='<alt>'>. The image must be visible and not broken.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Video blocks are rendered as <video controls playsInline> with src from the url field",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: in a chapter with a video block, inspect the DOM. Must render <video controls playsInline src='<url>'>. Video player controls must be visible and the video must be playable.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Video block has responsive layout: ≥900px shows ⅔ player + ⅓ title side by side; <900px stacks video above text",
+					"maxMark": 1.0,
+					"wsosSection": 4,
+					"extraDescription": "Test desktop (viewport ≥900px): the video player occupies approximately two-thirds of the row width and the title/label occupies the remaining third in the same row. Test mobile (viewport <900px via DevTools responsive mode): video is above the title text with no side-by-side layout.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Link blocks are rendered as <a> elements with target='_blank' and rel='noopener noreferrer'",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: in a chapter with a link block, inspect the DOM. The <a> element must have: href set to the block's url, target='_blank', rel='noopener noreferrer', and the visible link text from the block's title field.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "judgement",
+					"description": "Chapter content page visual design quality (lesson layout, typography, block rendering, readability)",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"judgementScoreDescription": [
+						"Chapter page is not implemented or content blocks are unstyled/rendered as raw data; the page is unreadable",
+						"Some block types are rendered but styling is inconsistent; typography is difficult to read; different block types are not visually distinguishable from each other",
+						"Most block types are rendered with appropriate styling; text is readable; headings have hierarchy; media blocks are visible; the page generally follows the SSA design guide with some deviations",
+						"All content block types are clearly and consistently styled; heading hierarchy is correct; paragraph text is readable and well-spaced; image and video blocks are well-integrated; the chapter page closely matches the SSA design guide and contributes to an engaging learning experience"
+					]
+				}
+			]
+		},
+		{
+			"name": "Quiz",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "All quiz questions are displayed with their answer options rendered as radio buttons (one selection per question)",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: navigate to a chapter that has a quiz. Every question from the API response must appear. Each question must show radio button options. Selecting one option must deselect any other option for the same question.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Quiz submission is blocked until every question has a selected answer",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: on a multi-question quiz, attempt to submit without answering all questions. The submit button must be disabled or submission must be prevented with a message. After answering all questions, the submit must become active.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Quiz answers are submitted via POST to the /quiz/validate endpoint with the correct payload and Bearer token",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: answer all questions and submit. In DevTools Network, verify: a POST request to /api/courses/:slug/chapters/:chapterId/quiz/validate with 'Authorization: Bearer <token>' header and the answers payload as specified in the OpenAPI spec.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Clear pass feedback is shown after a successful quiz submission",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: submit all correct answers. A distinct success message must appear (e.g. 'Congratulations!', 'Chapter completed', or similar positive confirmation).",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Clear fail feedback is shown when quiz answers are incorrect",
+					"maxMark": 0.25,
+					"wsosSection": 4,
+					"extraDescription": "Test: submit incorrect answers. A clear failure message must appear (e.g. 'Incorrect answers, please try again'). The user must be able to retry.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "Special case handled: quiz passed but chapter completion sync with the main backend failed - an informative message is shown",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: if the /quiz/validate response indicates the quiz was passed but the chapter completion could not be recorded on the main platform (check the OpenAPI spec for this special payload), the UI must show a specific message about the sync failure rather than a generic pass confirmation or generic error.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "After successful quiz completion, course and chapter state is refreshed so the course page reflects the updated completion",
+					"maxMark": 0.75,
+					"wsosSection": 4,
+					"extraDescription": "Test: complete a chapter quiz successfully, then navigate back to the course page. The now-completed chapter must show a completed state. The next chapter must now be unlocked. This must reflect actual API data (re-fetch or router revalidation).",
+					"calculation": { "type": "pass-or-fail" }
+				}
+			]
+		},
+		{
+			"name": "Error Handling",
+			"aspects": [
+				{
+					"type": "measurement",
+					"description": "400 Bad Request: a user-friendly error message is displayed",
+					"maxMark": 0.25,
+					"wsosSection": 2,
+					"extraDescription": "Test: trigger a 400 response (e.g. by sending a malformed quiz submission). A readable message must appear informing the user the request was invalid - not a raw error object, JSON dump, or stack trace.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "403 Forbidden: an understandable message explains the chapter is not yet available",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: paste a locked chapter URL directly into the address bar (e.g. /courses/:slug/chapters/:lockedChapterId) and navigate to it. The API returns 403. The UI must show a human-readable message (e.g. 'This chapter is not available yet - complete the previous chapter first') rather than a blank page or raw error.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "404 Not Found: a message informs the user the content is unavailable",
+					"maxMark": 0.5,
+					"wsosSection": 2,
+					"extraDescription": "Test: navigate to /courses/nonexistent-course. The API returns 404. The UI must show a clear, readable message (e.g. 'Course not found' or 'Content unavailable') - not a blank page or JavaScript exception.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "500 Internal Server Error: a message informs the user of a temporary server problem",
+					"maxMark": 0.25,
+					"wsosSection": 2,
+					"extraDescription": "Test: simulate a 500 response (e.g. mock via DevTools or a service override). The UI must show a user-friendly message (e.g. 'Something went wrong, please try again later') - not a blank screen or raw error body.",
+					"calculation": { "type": "pass-or-fail" }
+				},
+				{
+					"type": "measurement",
+					"description": "No raw stack traces or unhandled exceptions are exposed to the user in any error state",
+					"maxMark": 0.5,
+					"wsosSection": 4,
+					"extraDescription": "Test: trigger each error state (403, 404, 500, and a failed quiz submit). In every case the user must see a readable, human-friendly message. No raw JSON error objects, JavaScript stack traces, or default browser error pages should be visible.",
+					"calculation": { "type": "pass-or-fail" }
+				}
+			]
+		}
+	]
+}
