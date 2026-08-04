@@ -14,37 +14,38 @@ SkillShare Academy (SSA) uses a **main backend** for accounts, enrollment, credi
 
 Content service and the main backend are provided. The LMS must use the **same Bearer token** the learner received when signing in on the main SkillShare Academy platform (dashboard). Typically the dashboard opens the LMS with a **token in the query string**; the LMS frontend stores it and uses it on subsequent API calls. **Token lifetime:** The main backend issues tokens that expire **60 seconds** after login; expect `401 Unauthorized` after that until the user signs in again on the dashboard.
 
+### Setup
+
+This task is intended to be run locally rather than against the live competition infrastructure used during the actual competition. A Docker Compose file is provided at [`/assets/docker-compose.yml`](/assets/docker-compose.yml) to set up the required environment.
+
+Running `docker compose up -d` from the `assets/` directory starts six services:
+
+- **`content-service`**: the provided SkillShare Academy content service (the Module C solution), exposed at `http://localhost:5000`, making the API base URL `http://localhost:5000/api`. This is the only backend the LMS may call.
+- **`main-backend`**: the provided main backend (accounts, enrollment, credits, chapter completion), exposed at `http://localhost:5001`. It is used by the dashboard and by the content service; the LMS must **not** call it.
+- **`platform-frontend`**: the fully working **SSA dashboard**, exposed at `http://localhost:5174`. Sign in there to obtain a token and to open courses in the LMS.
+- **`bucket`**: the SSA media bucket (course hero images and lesson videos), exposed at `http://localhost:8081`. Media referenced by the content service resolves against this URL.
+- **`db`**: a MySQL server. On first startup it automatically imports both database dumps from `assets/db/` - `ssa_main_backend.sql` into the main backend's database and `ssa_content_service.sql` into the content service's database.
+- **`pma`**: phpMyAdmin, a web-based MySQL administration tool. It is exposed at `http://localhost:8080` and can be used to inspect the databases.
+
+The database is reachable at `localhost:3306` (user `root`, password `toor`). It is provided for inspection only: the API is the contract for this module, and you must not modify the provided services or their data.
+
+The LMS frontend you build is **not** part of this Compose file; you develop and run it yourself. The dashboard links to `http://localhost:5173` by default, so run your dev server on that port (Vite's default) and the dashboard's "open course / continue learning" links will point at your application.
+
 ### Dashboard and LMS URLs
 
-A fully working **SSA dashboard** application is supplied for assessment and development. It is deployed at:
+**Testing:** All seeded users use the password `password123` (for example **alice@example.com** / **password123**) when signing in on the dashboard at `http://localhost:5174`.
 
-`https://cXX-YYYY-dashboard.ssa.skillsit.hu`
-
-(Use your competition `cXX` username and `YYYY` PIN.)
-
-**Testing:** All seeded users use the password `password123` (for example **alice@example.com** / **password123**) when signing in on the dashboard for development and testing.
-
-**Long-lived test token (~7 days):** To avoid the **60-second** expiry on dashboard login tokens while you develop, you can use this Bearer token for **alice@example.com** (same as in Module C). Append `?token=` plus the token to your LMS URL, or store it the way your app expects (e.g. `localStorage`).
-
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IlNTQSJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzc1MTYyNzA0fQ.xGCNwuEthwy6iGWkS8FkCk5Wm9VYV7cLF41T6CLl_b0
-```
+**Token lifetime during development:** Dashboard login tokens expire after **60 seconds**, which is deliberate - the LMS must handle expiry (see [Error handling](#error-handling)). If the short expiry gets in the way while you build, raise `CONTENT_TOKEN_TTL_SECONDS` on the `main-backend` service in [`/assets/docker-compose.yml`](/assets/docker-compose.yml) and restart it. The `401` behaviour must still work as specified.
 
 **Hint:** For development and UI testing, we recommend opening the **Tailwind CSS & ShadCN UI Tutorial** course at **`/courses/tailwind-css-shadcn-ui-tutorial`**. It has the richest lesson content in the seed data (headings, paragraphs, lists, images, video, links, quizzes), so it is the best course to exercise every content block and layout rule. Enroll **alice@example.com** on that course in the dashboard if she is not already enrolled.
 
-By default, **all navigation** from the dashboard to the LMS targets the competitor's **deployed** LMS frontend at:
-
-`https://cXX-YYYY-module-c.ssa.skillsit.hu`
-
-**Local development:** To use the **same dashboard** against a **locally running** LMS (e.g. Vite on `http://localhost:5173`), set the **`lmsSiteUrl`** entry in the browser's **localStorage** (on the dashboard origin) to your dev LMS base URL (no trailing slash). The dashboard uses this value so links to "open course / continue learning" go to your development site instead of the default deployed LMS. Remove or reset `lmsSiteUrl` to return to the default behaviour.
+**Serving the LMS elsewhere:** If you cannot use `http://localhost:5173`, set the **`lmsSiteUrl`** entry in the browser's **localStorage** (on the dashboard origin, `http://localhost:5174`) to your LMS base URL (no trailing slash). The dashboard uses this value so links to "open course / continue learning" go to your site. Remove or reset `lmsSiteUrl` to return to the default behaviour.
 
 **Relationship to Module C:** Module C defines and implements the **content service** API and data model. Module D consumes **only that API** for all required LMS behaviour (course details, chapter content, quiz validation). The main backend still handles accounts and completion bookkeeping, but the **LMS frontend must not call the main backend's HTTP API** - the content service coordinates with the main backend where needed (e.g. when a quiz is passed).
 
-**Base URL of the content service:** `https://cXX-YYYY-module-c.ssa.skillsit.hu` where `cXX` is your username and `YYYY` is your PIN code (see Module C handout for the exact pattern).
+**Base URL of the content service:** `http://localhost:5000`, making the API base URL `http://localhost:5000/api`.
 
-**API documentation:** OpenAPI specification for the content service is available in the `assets` directory: [`/assets/module-c/api/ssa-content-service-openapi.yaml`](/assets/module-c/api/ssa-content-service-openapi.yaml). It is the reference for all endpoints the LMS must call.
-
-**Database:** Competitors do **not** have direct access to the content service database. Schema and behaviour are defined by the API documentation.
+**API documentation:** OpenAPI specification for the content service is available in the `assets` directory: [`/assets/api/ssa-content-service-openapi.yaml`](/assets/api/ssa-content-service-openapi.yaml). It is the reference for all endpoints the LMS must call.
 
 You must implement the frontend using a javascript **framework**. The application must be a **Single Page Application (SPA)**. **Routing must be handled by the framework.** Reloading a deep-linked URL must show the same view the user would see when navigating there inside the app (after authentication state is restored from storage), except for unsaved user-driven inputs.
 
@@ -62,7 +63,7 @@ The frontend must implement the following functional requirements:
 
 ### Design guidelines
 
-The handout includes a **SkillShare Academy (SSA) design guide** and **graphic design assets** (reference images) for **both** the course page and the chapter page. Competitors must follow the design guide and match the provided visuals **as closely as practicable** (layout, hierarchy, spacing, color and typography where specified, and component treatment).
+The `assets` directory includes a **SkillShare Academy (SSA) design guide** ([`/assets/style-guide/ssa-style-guide.md`](/assets/style-guide/ssa-style-guide.md)), **logos** ([`/assets/logos/`](/assets/logos/)), **fonts** ([`/assets/fonts/`](/assets/fonts/)) and **graphic design assets** (reference images in [`/assets/design/`](/assets/design/)) for **both** the course page and the chapter page, in light and dark theme. Competitors must follow the design guide and match the provided visuals **as closely as practicable** (layout, hierarchy, spacing, color and typography where specified, and component treatment).
 
 Where the design guide does not cover a detail (e.g. a specific content block or error state), extend the same patterns so the UI stays consistent. The implementation must remain **responsive** across screen sizes, including the video layout described for the chapter page below.
 
@@ -71,7 +72,7 @@ Where the design guide does not cover a detail (e.g. a specific content block or
 The content service can return various errors. The frontend must handle them and show **understandable** messages (not raw stack traces). At minimum, handle:
 
 - `400 Bad Request` - Malformed request; inform the user briefly.
-- `401 Unauthorized` - Missing, invalid, or expired token. **Redirect the user to the main SSA dashboard application** (use the dashboard base URL from [Dashboard and LMS URLs](#dashboard-and-lms-urls), e.g. `https://cXX-YYYY-dashboard.ssa.skillsit.hu`, typically the app root or the entry point given in the handout). **Full-page navigation** (`window.location` or equivalent) is required so the user leaves the LMS and can re-authenticate. Also, clear the stored LMS token before or as part of handling. Do not leave the user on the LMS with only an inline error.
+- `401 Unauthorized` - Missing, invalid, or expired token. **Redirect the user to the main SSA dashboard application** (the dashboard base URL from [Setup](#setup), `http://localhost:5174`, typically the app root). **Full-page navigation** (`window.location` or equivalent) is required so the user leaves the LMS and can re-authenticate. Also, clear the stored LMS token before or as part of handling. Do not leave the user on the LMS with only an inline error.
 - `403 Forbidden` - User not allowed to access the resource (e.g. chapter locked); explain that the chapter is not available yet.
 - `404 Not Found` - Course or chapter not found; inform the user the content is unavailable.
 - `500 Internal Server Error` - Server error; inform the user of a temporary problem.
@@ -89,7 +90,7 @@ Loads course details via `GET /api/courses/:slug` with `Authorization: Bearer <t
 The page must include:
 
 - **Course header:** title, description, difficulty, total chapters, total credits (as returned by the API).
-- **Hero / image:** fetch the hero image from the SSA bucket: `https://bucket.ssa.skillsit.hu/<slug>.webp` (replace `<slug>` with the course slug from the API).
+- **Hero / image:** fetch the hero image from the SSA bucket: `http://localhost:8081/<slug>.webp` (replace `<slug>` with the course slug from the API). Not every course has a hero image in the bucket, and individual content blocks may reference media that cannot be loaded; the page must **degrade gracefully** - a broken or unreachable media URL must not break the layout or leave the page in a loading state.
 - **Chapter list:** all chapters in order, each with title, short description, credits, and **completed** state.
 - **Sequential access:** only the first chapter, or a chapter whose **previous** chapter is completed, is **unlocked** (link to chapter). Locked chapters must be clearly indicated and **must not** navigate to the chapter view.
 - **Completed chapters** must be visually distinct (e.g. badge or styling).
@@ -98,7 +99,7 @@ The page must include:
 
 Loads chapter content via `GET /api/courses/:slug/chapters/:chapterId` (Bearer required).
 
-**The `content` array (lesson body):** The JSON body is a single **chapter payload** (not wrapped in an outer `chapter` object): see schema `ChapterContentResponse` in [`/assets/module-c/api/ssa-content-service-openapi.yaml`](/assets/module-c/api/ssa-content-service-openapi.yaml). Besides metadata (`courseId`, `chapterId`, `title`, optional `description`, `credits`) and `quiz`, the field **`content`** is an **ordered list of learning blocks**.
+**The `content` array (lesson body):** The JSON body is a single **chapter payload** (not wrapped in an outer `chapter` object): see schema `ChapterContentResponse` in [`/assets/api/ssa-content-service-openapi.yaml`](/assets/api/ssa-content-service-openapi.yaml). Besides metadata (`courseId`, `chapterId`, `title`, optional `description`, `credits`) and `quiz`, the field **`content`** is an **ordered list of learning blocks**.
 
 - Each item is an object **discriminated by `type`**, with an **`orderIndex`** that defines display order within the chapter (sort ascending).
 - Allowed **`type`** values correspond to stored content blocks: **`h1`**, **`h2`**, **`h3`**, **`h4`**, **`paragraph`**, **`list_item`**, **`image`**, **`video`**, **`link`**.
@@ -112,7 +113,7 @@ The **`quiz`** object in the same response holds multiple-choice questions for t
 
 The page must include:
 
-- **Sticky chapter bar:** Implement a **sticky** sub-header that stays visible while the learner scrolls the lesson. On **one row**, include (1) a **Back to course** link to the parent course page (`/courses/:slug`) and (2) a **button** that opens the table-of-contents drawer. **Do not** place the TOC control only in the global site header; it belongs beside **Back to course** in this sticky bar. Visual reference: [`chapter-page-light-with-toc.png`](/assets/module-d/design/chapter-page-light-with-toc.png), [`chapter-page-dark-with-toc.png`](/assets/module-d/design/chapter-page-dark-with-toc.png).
+- **Sticky chapter bar:** Implement a **sticky** sub-header that stays visible while the learner scrolls the lesson. On **one row**, include (1) a **Back to course** link to the parent course page (`/courses/:slug`) and (2) a **button** that opens the table-of-contents drawer. **Do not** place the TOC control only in the global site header; it belongs beside **Back to course** in this sticky bar. Visual reference: [`chapter-page-light-with-toc.png`](/assets/design/chapter-page-light-with-toc.png), [`chapter-page-dark-with-toc.png`](/assets/design/chapter-page-dark-with-toc.png).
 - **Table of contents (drawer):** The button opens a **drawer** (slide-out panel from the side) titled **Contents**. Populate it from the chapter **`content`** array: include every block with **`type`** **`h1`**, **`h2`**, or **`h3`**, in ascending **`orderIndex`** order, using each block’s **`text`**. Show **heading hierarchy** (e.g. indent **`h2`** under **`h1`**, **`h3`** under **`h2`**). Each entry must be a **navigation control** that scrolls or moves focus to that heading in the lesson. **`h4`** headings are rendered in the body but are **not** listed in the TOC.
 - **Header:** chapter title, optional description, credits and course/chapter identifiers as appropriate from the API response (below the sticky bar, as in the reference layout).
 - **Lesson content:** render the `content` array in **`orderIndex`** order. Supported block types:
@@ -132,7 +133,7 @@ The page must include:
 
 #### Layout & Theme
 
-- **Header:** logo or title linking to the **dashboard** home URL; link to **dashboard courses** (use the same dashboard base URL as in [Dashboard and LMS URLs](#dashboard-and-lms-urls), e.g. `https://cXX-YYYY-dashboard.ssa.skillsit.hu`); dark/light theme toggle persisted in `localStorage`.
+- **Header:** logo or title linking to the **dashboard** home URL; link to the **dashboard courses** page (use the same dashboard base URL as in [Setup](#setup), `http://localhost:5174`); dark/light theme toggle persisted in `localStorage`.
 - **Theme switching:** The application must support both a **dark theme** (default) and a **light theme**. Both themes are defined in the SSA style guide (`assets/style-guide/ssa-style-guide.md`). The active theme must be persisted in `localStorage` so the user's preference is restored on page reload. When opening the page, there should be no theme color flickering.
 - When a token is present, show that the user is **signed in** (e.g. "Signed in"); loading the user's **name** from the main backend is **optional**.
 - **Loading:** visible loading state during navigation or slow requests.

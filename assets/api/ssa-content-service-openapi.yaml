@@ -1,0 +1,644 @@
+openapi: 3.0.3
+info:
+  title: SkillShare Academy Content Service API
+  description: |
+    REST API for **Module C** LMS content: course catalog, chapter content (rich blocks + quiz),
+    quiz validation, and optional course administration (`POST` / `PUT`).
+
+    **Authentication:** Most routes require `Authorization: Bearer <token>` where the token is the
+    same **HMAC-signed** token issued by the SkillShare Academy main backend (see
+    `project-description.md` and `handout-hmac-sha256-token-signing.md`).
+
+    Default local base: `http://localhost:5000` (see `PORT` in the content service app).
+  version: 1.0.0
+  contact:
+    name: SkillShare Academy - Module C
+
+servers:
+  - url: http://localhost:5000
+    description: Local default content service
+  - url: "{baseUrl}"
+    description: Deployed instance
+    variables:
+      baseUrl:
+        default: http://localhost:5000
+
+tags:
+  - name: Meta
+  - name: Courses
+    description: Catalog, details, create/update
+  - name: Chapters
+    description: Chapter content and quiz
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Meta]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Typically includes an ok indicator (implementation may append diagnostic suffix)
+                  timestamp:
+                    type: string
+                    description: The current timestamp
+                  version:
+                    type: string
+                    description: The version of the content service
+
+  /api/courses:
+    get:
+      tags: [Courses]
+      summary: Course catalog
+      description: All courses with chapter summaries. **No authentication.**
+      security: []
+      responses:
+        "200":
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [courses]
+                properties:
+                  courses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CourseCatalogItem"
+        "500":
+          $ref: "#/components/responses/CoursesFetchError"
+
+    post:
+      tags: [Courses]
+      summary: Create course
+      description: |
+        Creates a course with no chapters (`totalChapters` / `totalCredits` start at 0).
+        Body may be flat `{ title, slug, ... }` or nested `{ course: { title, slug, ... } }`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseRequest"
+            examples:
+              flat:
+                value:
+                  title: New Course Title
+                  slug: new-course-slug
+                  description: Optional description
+                  difficulty: beginner
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [course]
+                properties:
+                  course:
+                    $ref: "#/components/schemas/CourseCatalogItem"
+        "400":
+          $ref: "#/components/responses/BadRequestCourse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/DuplicateSlug"
+        "500":
+          $ref: "#/components/responses/CourseCreateError"
+
+  /api/courses/{id}:
+    put:
+      tags: [Courses]
+      summary: Update course by id
+      description: |
+        Updates metadata by **numeric** course primary key. At least one of `title`, `slug`,
+        `description`, `difficulty` must be present. Recomputes `totalChapters` / `totalCredits` from chapters.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseRequest"
+            examples:
+              partial:
+                value:
+                  title: Updated Title
+                  description: Updated description
+      responses:
+        "200":
+          description: Updated course (catalog item shape, including `chapters`)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [course]
+                properties:
+                  course:
+                    $ref: "#/components/schemas/CourseCatalogItem"
+        "400":
+          $ref: "#/components/responses/BadRequestCourseUpdate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/CourseNotFound"
+        "409":
+          $ref: "#/components/responses/DuplicateSlug"
+        "500":
+          $ref: "#/components/responses/CourseUpdateError"
+
+  /api/courses/{slug}:
+    get:
+      tags: [Courses]
+      summary: Course details by slug
+      description: Requires enrollment on the main backend; includes `isCompleted` per chapter from main backend.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Course with chapters
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [course]
+                properties:
+                  course:
+                    $ref: "#/components/schemas/CourseDetails"
+        "400":
+          $ref: "#/components/responses/InvalidSlug"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/NotEnrolled"
+        "404":
+          $ref: "#/components/responses/CourseNotFound"
+        "500":
+          $ref: "#/components/responses/CourseDetailsError"
+
+  /api/courses/{slug}/chapters/{chapterId}:
+    get:
+      tags: [Chapters]
+      summary: Chapter content and quiz
+      description: |
+        Sequential access: first chapter unlocked when enrolled; later chapters require previous completed
+        (per main backend). Returns `content[]` with `orderIndex`; paragraph/list_item include `html` and `rawText`.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Chapter payload (top-level, not wrapped)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterContentResponse"
+        "400":
+          description: Bad slug or chapter id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/ChapterLockedOrNotEnrolled"
+        "404":
+          $ref: "#/components/responses/ChapterOrCourseNotFound"
+        "500":
+          $ref: "#/components/responses/ChapterContentError"
+
+  /api/courses/{slug}/chapters/{chapterId}/quiz/validate:
+    post:
+      tags: [Chapters]
+      summary: Validate quiz answers
+      description: |
+        If `passed` is true, the service calls the main backend to record chapter completion.
+        On main-backend failure after a pass, returns **502** or **503** with `passed: true` and
+        `code: CHAPTER_COMPLETION_FAILED`.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizValidateRequest"
+      responses:
+        "200":
+          description: Validation result (all correct or not)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [passed]
+                properties:
+                  passed:
+                    type: boolean
+        "400":
+          description: Invalid payload or slug/id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/NotEnrolledOrLocked"
+        "404":
+          $ref: "#/components/responses/ChapterOrCourseNotFound"
+        "502":
+          description: Quiz passed but main backend completion failed (non-503 cases)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizCompletionFailed"
+        "503":
+          description: Quiz passed but main backend unreachable / not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizCompletionFailed"
+        "500":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: SSA HMAC token
+      description: |
+        Token from main backend login. Header: `Authorization: Bearer <token>`.
+
+  schemas:
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+    Difficulty:
+      type: string
+      enum: [beginner, intermediate, advanced]
+
+    ChapterSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        credits:
+          type: integer
+        orderIndex:
+          type: integer
+
+    CourseCatalogItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        difficulty:
+          $ref: "#/components/schemas/Difficulty"
+        totalChapters:
+          type: integer
+        totalCredits:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        chapters:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChapterSummary"
+
+    CourseDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        difficulty:
+          $ref: "#/components/schemas/Difficulty"
+        totalChapters:
+          type: integer
+        totalCredits:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        chapters:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              description:
+                type: string
+                nullable: true
+              credits:
+                type: integer
+              isCompleted:
+                type: boolean
+
+    CreateCourseRequest:
+      type: object
+      description: Top-level fields, or nest equivalent fields under `course`.
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        difficulty:
+          $ref: "#/components/schemas/Difficulty"
+        course:
+          type: object
+          properties:
+            title:
+              type: string
+            slug:
+              type: string
+            description:
+              type: string
+              nullable: true
+            difficulty:
+              $ref: "#/components/schemas/Difficulty"
+
+    UpdateCourseRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        difficulty:
+          $ref: "#/components/schemas/Difficulty"
+
+    QuizValidateRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [questionId, selectedOptionId]
+            properties:
+              questionId:
+                type: integer
+              selectedOptionId:
+                type: string
+                description: Option key, e.g. a, b, c
+
+    ChapterContentResponse:
+      type: object
+      required: [courseId, chapterId, title, content, quiz, credits]
+      properties:
+        courseId:
+          type: integer
+        chapterId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        credits:
+          type: integer
+        content:
+          type: array
+          description: Ordered blocks; union of heading, paragraph, list_item, image, video, link
+          items:
+            type: object
+            description: Discriminated by `type` and includes `orderIndex`
+        quiz:
+          type: object
+          properties:
+            questions:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  text:
+                    type: string
+                  options:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        text:
+                          type: string
+
+    QuizCompletionFailed:
+      type: object
+      properties:
+        passed:
+          type: boolean
+          example: true
+        error:
+          type: string
+        code:
+          type: string
+          example: CHAPTER_COMPLETION_FAILED
+        mainBackendStatus:
+          type: integer
+        mainBackendBody:
+          description: Opaque JSON from main backend when available
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: Unauthorized
+            code: UNAUTHORIZED
+
+    InvalidSlug:
+      description: Invalid slug
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    CourseNotFound:
+      description: Unknown course slug or id
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: Course not found
+            code: COURSE_NOT_FOUND
+
+    NotEnrolled:
+      description: Not Enrolled
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: Not enrolled in this course
+            code: NOT_ENROLLED
+
+    ChapterLockedOrNotEnrolled:
+      description: 403 - `NOT_ENROLLED` or `CHAPTER_LOCKED`
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    NotEnrolledOrLocked:
+      description: 403 from quiz route
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    ChapterOrCourseNotFound:
+      description: Chapter or Course not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    BadRequestCourse:
+      description: Course - Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    BadRequestCourseUpdate:
+      description: Course Update - Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    DuplicateSlug:
+      description: Duplicated slug
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: A course with this slug already exists
+            code: DUPLICATE_COURSE_SLUG
+
+    CoursesFetchError:
+      description: Courses fetch error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: Failed to fetch courses
+            code: COURSES_FETCH_ERROR
+
+    CourseCreateError:
+      description: Create course error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    CourseUpdateError:
+      description: Update course error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    CourseDetailsError:
+      description: Course details error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+    ChapterContentError:
+      description: Chapter content error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"

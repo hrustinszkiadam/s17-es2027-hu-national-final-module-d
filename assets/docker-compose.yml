@@ -1,0 +1,96 @@
+name: ssa-module-d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: ssa-module-d-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: toor
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./db:/dumps:ro
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-ptoor']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pma:
+    image: phpmyadmin/phpmyadmin
+    container_name: ssa-module-d-pma
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: toor
+    depends_on:
+      db:
+        condition: service_healthy
+
+  main-backend:
+    image: ghcr.io/skillsit-hu/es2027-s17-hu-r3-module-c-main-backend
+    container_name: ssa-module-d-main-backend
+    restart: unless-stopped
+    ports:
+      - '5001:5001'
+    environment:
+      NODE_ENV: production
+      PORT: 5001
+      DATABASE_URL: mysql://root:toor@db:3306/ssa_main_backend
+      API_VERSION: v1
+      API_BASE_PATH: /api/v1
+      CONTENT_TOKEN_SECRET: 38344ac35d91bfd0c8f43963b0ca188d2a039504e825ff968b0366855bdbca5b
+      CONTENT_TOKEN_TTL_SECONDS: 60
+    depends_on:
+      db:
+        condition: service_healthy
+
+  content-service:
+    image: ghcr.io/skillsit-hu/es2027-s17-hu-r3-module_c-solution-content-services
+    container_name: ssa-module-d-content-service
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: mysql://root:toor@db:3306/ssa_content_service
+      SKIP_DB_RESET_ON_STARTUP: 'true'
+      API_VERSION: v1
+      API_BASE_PATH: /api/v1
+      CONTENT_TOKEN_SECRET: 38344ac35d91bfd0c8f43963b0ca188d2a039504e825ff968b0366855bdbca5b
+      MAIN_BACKEND_BASE_URL: http://main-backend:5001
+    depends_on:
+      db:
+        condition: service_healthy
+      main-backend:
+        condition: service_started
+
+  bucket:
+    image: ghcr.io/skillsit-hu/es2027-s17-hu-r3-bucket
+    container_name: ssa-module-d-bucket
+    restart: unless-stopped
+    ports:
+      - '8081:80'
+
+  platform-frontend:
+    image: ghcr.io/skillsit-hu/es2027-s17-hu-r3-module-c-ssa-platform-frontend
+    container_name: ssa-module-d-platform-frontend
+    restart: unless-stopped
+    ports:
+      - '5174:80'
+    environment:
+      VITE_CONTENT_SERVICE_BASE_URL: http://localhost:5000/api
+      VITE_MAIN_BACKEND_BASE_URL: http://localhost:5001/api/v1
+      VITE_LMS_FRONTEND_BASE_URL: http://localhost:5173
+    depends_on:
+      content-service:
+        condition: service_started
+      main-backend:
+        condition: service_started
